@@ -1,6 +1,9 @@
 local config = require('blink.cmp.config').completion.accept
 local text_edits_lib = require('blink.cmp.lib.text_edits')
 local brackets_lib = require('blink.cmp.completion.brackets')
+local list = require('blink.cmp.completion.list')
+local state = require('blink.cmp.lib.state')
+local cfg = require('blink.cmp.config')
 
 --- @param ctx blink.cmp.Context
 --- @param item blink.cmp.CompletionItem
@@ -115,6 +118,10 @@ local function accept(ctx, item, callback)
       callback()
     end)
     :catch(function(err) vim.notify(err, vim.log.levels.ERROR, { title = 'blink.cmp' }) end)
+end
+
+if cfg.enabled and cfg.completion.trigger.show_on_backspace_after_insert_enter then
+  list.accept_emitter:on(function(ev) state.mark_enter(ev.context.bufnr) end)
 end
 
 return accept

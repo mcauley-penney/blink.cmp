@@ -2,6 +2,8 @@
 --- Notably, when "char added" is fired, the "cursor moved" event will not be fired.
 --- Unlike in regular neovim, ctrl + c and buffer switching will trigger "insert leave"
 
+local state = require('blink.cmp.lib.state')
+
 --- @class blink.cmp.BufferEvents
 --- @field has_context fun(): boolean
 --- @field show_in_snippet boolean
@@ -70,13 +72,26 @@ local function make_cursor_moved(self, snippet, on_cursor_moved)
       return
     end
 
-    local is_cursor_moved = ev.event == 'CursorMoved' or ev.event == 'CursorMovedI'
+    local state_flags = {
+      is_ignored = false,
+      is_backspace = false,
+      was_accept = false,
+      was_enter = false,
+    }
 
-    local is_ignored = is_cursor_moved and self.ignore_next_cursor_moved
+    local is_cursor_moved = ev.event == 'CursorMoved' or ev.event == 'CursorMovedI'
+    state_flags.is_ignored = is_cursor_moved and self.ignore_next_cursor_moved
     if is_cursor_moved then self.ignore_next_cursor_moved = false end
 
-    local is_backspace = did_backspace and is_cursor_moved
+    state_flags.is_backspace = did_backspace and is_cursor_moved
     did_backspace = false
+
+    if ev.event == 'InsertEnter' then state.mark_enter(ev.buf) end
+
+    if state_flags.is_backspace then
+      state_flags.was_accept = state.consume_enter(ev.buf)
+      state_flags.was_enter = state.consume_enter(ev.buf)
+    end
 
     -- characters added so let textchanged handle it
     if self.last_char ~= '' then return end
@@ -84,7 +99,7 @@ local function make_cursor_moved(self, snippet, on_cursor_moved)
     if not require('blink.cmp.config').enabled() then return end
     if not self.show_in_snippet and not self.has_context() and snippet.active() then return end
 
-    on_cursor_moved(is_cursor_moved and 'CursorMoved' or ev.event, is_ignored, is_backspace)
+    on_cursor_moved(is_cursor_moved and 'CursorMoved' or ev.event, state_flags)
   end
 end
 
